@@ -169,7 +169,7 @@ ConditionalStateProbs = function(x,p,M,t)
 	y
 }
 
-frame=function(x,xl="Days from exposure",yl="Probability")
+frame = function(x,xl="Days from exposure",yl="Probability")
 {
 	plot(x,x,type="n",ylim=c(0,1), ylab=yl, xlab=xl)
 }
