@@ -1,5 +1,6 @@
 library(coga,quietly=TRUE)
 
+
 deltaParams = function()
 {
 	msus = 1000
