@@ -55,7 +55,7 @@ makeModel = function(Q)
 
 gammas = function(Q)
 {
-	Name = c("Sus","Lat","Asy","Pre","Mld","Sev")
+	Name = c("Sus","Lat","Asy","Pre","Mld","Svr")
 	Parameter = c("U","V","W","X","Y","Z")
 	Shape = Q$shape
 	Rate = Q$rate
@@ -69,7 +69,7 @@ gammas = function(Q)
 
 probs = function(Q)
 {
-	Name = c("Symptomatic","Severe")
+	Name = c("Symptomatic","Svrere")
 	Parameter = c("q","r")
 	Value = c(Q$q,Q$r)
 	data.frame(Parameter,Name,Value)
@@ -80,12 +80,24 @@ FF = function(x,P,use)
 	pcoga(x,P$shape[use],P$rate[use])
 }
 
+Sus = 1
+Lat = 2
+Asy = 3
+Pre = 4
+Mld = 5
+Svr = 6
+RecS = 7
+RecA = 8
+NStates = RecA
+U = 1
+V = 2
+W = 3
+X = 4
+Y = 5
+Z = 6
+
 StateProbs01 = function(x,M,transmission)
 {
-	Sus = 1; Lat = 2; Asy = 3; Pre = 4; Mld = 5; Sev = 6; RecS = 7; RecA = 8
-	NStates = RecA
-	U = 1; V = 2; W = 3; X = 4; Y = 5; Z = 6
-
 	s = matrix(0,nrow=NStates,ncol=length(x))
 	if (transmission)
 	{
@@ -94,7 +106,7 @@ StateProbs01 = function(x,M,transmission)
 		s[Asy,] = (1-M$q) * (FF(x,M,c(V)) - FF(x,M,c(V,X)))
 		s[Pre,] = M$q * (FF(x,M,c(V)) - FF(x,M,c(V,W)))
 		s[Mld,] = M$q*(1-M$r) * (FF(x,M,c(V,W)) - FF(x,M,c(V,W,Z)))
-		s[Sev,] = M$q*M$r * (FF(x,M,c(V,W)) - FF(x,M,c(V,W,Y)))
+		s[Svr,] = M$q*M$r * (FF(x,M,c(V,W)) - FF(x,M,c(V,W,Y)))
 		s[RecS,] = M$q*M$r * FF(x,M,c(V,W,Y)) + M$q*(1-M$r)*FF(x,M,c(V,W,Z))
 		s[RecA,] = (1-M$q) * FF(x,M,c(V,X))
 	}
@@ -105,7 +117,7 @@ StateProbs01 = function(x,M,transmission)
 		s[Asy,] = (1-M$q) * (FF(x,M,c(U,V)) - FF(x,M,c(U,V,X)))
 		s[Pre,] = M$q * (FF(x,M,c(U,V)) - FF(x,M,c(U,V,W)))
 		s[Mld,] = M$q*(1-M$r) * (FF(x,M,c(U,V,W)) - FF(x,M,c(U,V,W,Z)))
-		s[Sev,] = M$q*M$r * (FF(x,M,c(U,V,W)) - FF(x,M,c(U,V,W,Y)))
+		s[Svr,] = M$q*M$r * (FF(x,M,c(U,V,W)) - FF(x,M,c(U,V,W,Y)))
 		s[RecS,] = M$q*M$r * FF(x,M,c(U,V,W,Y)) + M$q*(1-M$r)*FF(x,M,c(U,V,W,Z))
 		s[RecA,] = (1-M$q) * FF(x,M,c(U,V,X))
 	}
@@ -117,8 +129,8 @@ StateProbs = function(x,p,M)
 	p * StateProbs01(x,M,TRUE) + (1-p) * StateProbs01(x,M,FALSE)
 }
 
+Unconditional = c(1,1,1,1,1,1,1,1)
 NoSymptoms = c(1,1,1,1,0,0,0,1)
-
 Infected = c(0,1,1,1,1,1,0,0)
 
 PcrTest = function(sens,spec=1)
@@ -134,8 +146,8 @@ AntigenTest = function(sens,spec=1)
 ProbInfected = function(x,p,t,M)
 {
 	probs = StateProbs(x,p,M)
-	bot = (NoSymptoms * t) %*% probs
-	top = (Infected * NoSymptoms * t) %*% probs
+	bot = t %*% probs
+	top = (Infected * t) %*% probs
 	top/bot
 }
 
@@ -156,3 +168,61 @@ ConditionalStateProbs = function(x,p,M,t)
 	}
 	y
 }
+
+frame=function(x)
+{
+	plot(x,x,type="n",ylim=c(0,1),
+		ylab="Probability",
+		xlab="Days from exposure")
+}
+
+maximizer = function(x)
+{
+	(1:length(x))[x==max(x)][1]
+}
+
+stateCols = c("green","yellow","pink","orange","red","red","cyan","cyan")
+stateNames = c("Sus","Lat","Asy","Pre","Sym","Sym","Rec","Rec")
+
+pileup = function(x,ss)
+{
+	frame(x)
+	s = apply(ss,2,cumsum)
+	lns = rev((1:length(s[,1]))[-c(5,7)])
+	for (i in lns)
+	{
+		lines(x,s[i,])
+		polygon(c(x,max(x),0),c(s[i,],0,0),col=stateCols[i],border=NA)
+	}
+
+	for (i in c(Sus,Lat,Asy,Pre,Svr,RecA))
+	{
+		zz = ss[i,]
+		if (i > 1)
+			z = s[i-1,]
+		else
+			z = rep(0,length(zz))
+
+		if (i == Svr || i == RecA)
+		{
+			zz = ss[i,] + ss[i-1,]
+			z = s[i-2,]
+		}
+		
+
+		if (max(zz) > 0)
+		{
+			whj = maximizer(zz)
+
+			whx = x[whj]
+			whx = min(c(whx,0.90*max(x)))
+			whx = max(c(whx,0.05*max(x)))
+
+			why = z[whj] + zz[whj]/2
+
+			text(whx,why,stateNames[i])
+		}
+	}
+}
+
+x = (0:100)/4

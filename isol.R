@@ -2,31 +2,31 @@ source("covid.R")
 
 library(xtable,quietly=TRUE)
 
-frame=function(x)
-{
-	plot(x,x,type="n",ylim=c(0,1),
-		ylab="Probability",
-		xlab="Days from exposure")
-}
+#frame=function(x)
+#{
+#	plot(x,x,type="n",ylim=c(0,1),
+#		ylab="Probability",
+#		xlab="Days from exposure")
+#}
 
 DMod = makeModel(deltaParams())
 OPar = omicronParams()
 OMod = makeModel(OPar)
 
-stateCols = c("cyan","yellow","pink","orange","red","red","cyan","cyan")
+#stateCols = c("cyan","yellow","pink","orange","red","red","cyan","cyan")
 
-pileup = function(x,s)
-{
-	frame(x)
-	for (i in 1:length(s[1,]))
-		s[,i] = cumsum(s[,i])
-	lns = rev((1:length(s[,1]))[-c(5,7)])
-	for (i in lns)
-	{
-		lines(x,s[i,])
-		polygon(c(x,max(x),0),c(s[i,],0,0),col=stateCols[i],border=NA)
-	}
-}
+#pileup = function(x,s)
+#{
+#	frame(x)
+#	for (i in 1:length(s[1,]))
+#		s[,i] = cumsum(s[,i])
+#	lns = rev((1:length(s[,1]))[-c(5,7)])
+#	for (i in lns)
+#	{
+#		lines(x,s[i,])
+#		polygon(c(x,max(x),0),c(s[i,],0,0),col=stateCols[i],border=NA)
+#	}
+#}
 
 print(xtable(gammas(DMod),
 	caption="Gamma time-in-state distribution parameters and summary
@@ -55,7 +55,7 @@ print(xtable(gammas(OMod),
 
 x = (0:100)/4
 
-pileup(x,StateProbs(x,1,DMod))
+pileup(x,StateProbs(x,0.2,DMod))
 
 pileup(x,ConditionalStateProbs(x,1,DMod,NoSymptoms))
 
