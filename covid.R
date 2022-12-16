@@ -169,11 +169,9 @@ ConditionalStateProbs = function(x,p,M,t)
 	y
 }
 
-frame=function(x)
+frame=function(x,xl="Days from exposure",yl="Probability")
 {
-	plot(x,x,type="n",ylim=c(0,1),
-		ylab="Probability",
-		xlab="Days from exposure")
+	plot(x,x,type="n",ylim=c(0,1), ylab=yl, xlab=xl)
 }
 
 maximizer = function(x)
@@ -186,7 +184,7 @@ stateNames = c("Sus","Lat","Asy","Pre","Sym","Sym","Rec","Rec")
 
 pileup = function(x,ss)
 {
-	frame(x)
+	frame(x,yl="Cumulative probability")
 	s = apply(ss,2,cumsum)
 	lns = rev((1:length(s[,1]))[-c(5,7)])
 	for (i in lns)
