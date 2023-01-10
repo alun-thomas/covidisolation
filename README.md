@@ -6,4 +6,6 @@ For complete information see the manuscript in the provided pdf file.
 
 **covid.R** is a file of R code that defines the general programs for the probability calculations.
 
+**covid.pdf** gives a description of the functions in covid.R.
+
 **isol.R** gives the code used to generate the plots and tables used in the manuscript.
