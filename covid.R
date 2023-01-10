@@ -1,5 +1,21 @@
 library(coga,quietly=TRUE)
 
+.Sus = 1
+.Lat = 2
+.Asy = 3
+.Pre = 4
+.Mld = 5
+.Svr = 6
+.RecS = 7
+.RecA = 8
+.NStates = .RecA
+
+.U = 1
+.V = 2
+.W = 3
+.X = 4
+.Y = 5
+.Z = 6
 
 deltaParams = function()
 {
@@ -54,73 +70,46 @@ makeModel = function(Q)
 	list(q=Q$Psymp, r=Q$Psevere, shape=means^2/vars, rate=means/vars) 
 }
 
-gammas = function(Q)
-{
-	Name = c("Sus","Lat","Asy","Pre","Mld","Svr")
-	Parameter = c("U","V","W","X","Y","Z")
-	Shape = Q$shape
-	Rate = Q$rate
-	Mean = Shape/Rate
-	Variance = Shape/Rate^2
-	tail = 0.025
-	Lower = qgamma(tail,Shape,Rate)
-	Upper = qgamma(1-tail,Shape,Rate)
-	data.frame(Parameter,Name,Shape,Rate,Mean,Variance,Lower,Upper)
-}
-
-probs = function(Q)
-{
-	Name = c("Symptomatic","Svrere")
-	Parameter = c("q","r")
-	Value = c(Q$q,Q$r)
-	data.frame(Parameter,Name,Value)
-}
-
 FF = function(x,P,use)
 {
 	pcoga(x,P$shape[use],P$rate[use])
 }
 
-Sus = 1
-Lat = 2
-Asy = 3
-Pre = 4
-Mld = 5
-Svr = 6
-RecS = 7
-RecA = 8
-NStates = RecA
-U = 1
-V = 2
-W = 3
-X = 4
-Y = 5
-Z = 6
-
 StateProbs01 = function(x,M,transmission)
 {
-	s = matrix(0,nrow=NStates,ncol=length(x))
+	s = matrix(0,nrow=.NStates,ncol=length(x))
 	if (transmission)
 	{
-		s[Sus,] = 0
-		s[Lat,] = 1 - FF(x,M,c(V))
-		s[Asy,] = (1-M$q) * (FF(x,M,c(V)) - FF(x,M,c(V,X)))
-		s[Pre,] = M$q * (FF(x,M,c(V)) - FF(x,M,c(V,W)))
-		s[Mld,] = M$q*(1-M$r) * (FF(x,M,c(V,W)) - FF(x,M,c(V,W,Z)))
-		s[Svr,] = M$q*M$r * (FF(x,M,c(V,W)) - FF(x,M,c(V,W,Y)))
-		s[RecS,] = M$q*M$r * FF(x,M,c(V,W,Y)) + M$q*(1-M$r)*FF(x,M,c(V,W,Z))
-		s[RecA,] = (1-M$q) * FF(x,M,c(V,X))
+		s[.Sus,] = 0
+		fv = FF(x,M,c(.V))
+		s[.Lat,] = 1-fv
+		fvx = FF(x,M,c(.V,.X))
+		s[.Asy,] = (1-M$q)*(fv-fvx)
+		fvw = FF(x,M,c(.V,.W))
+		s[.Pre,] = M$q*(fv-fvw)
+		fvwz = FF(x,M,c(.V,.W,.Z))
+		s[.Mld,] = M$q*(1-M$r)*(fvw-fvwz)
+		fvwy = FF(x,M,c(.V,.W,.Y))
+		s[.Svr,] = M$q*M$r*(fvw-fvwy)
+		s[.RecS,] = M$q*M$r*fvwy+M$q*(1-M$r)*fvwz
+		s[.RecA,] = (1-M$q)*fvx
 	}
 	else
 	{
-		s[Sus,] = 1-FF(x,M,c(U))
-		s[Lat,] = FF(x,M,c(U)) - FF(x,M,c(U,V))
-		s[Asy,] = (1-M$q) * (FF(x,M,c(U,V)) - FF(x,M,c(U,V,X)))
-		s[Pre,] = M$q * (FF(x,M,c(U,V)) - FF(x,M,c(U,V,W)))
-		s[Mld,] = M$q*(1-M$r) * (FF(x,M,c(U,V,W)) - FF(x,M,c(U,V,W,Z)))
-		s[Svr,] = M$q*M$r * (FF(x,M,c(U,V,W)) - FF(x,M,c(U,V,W,Y)))
-		s[RecS,] = M$q*M$r * FF(x,M,c(U,V,W,Y)) + M$q*(1-M$r)*FF(x,M,c(U,V,W,Z))
-		s[RecA,] = (1-M$q) * FF(x,M,c(U,V,X))
+		fu = FF(x,M,c(.U))
+		s[.Sus,] = 1-fu
+		fuv = FF(x,M,c(.U,.V))
+		s[.Lat,] = fu-fuv
+		fuvx = FF(x,M,c(.U,.V,.X))
+		s[.Asy,] = (1-M$q)*(fuv-fuvx)
+		fuvw = FF(x,M,c(.U,.V,.W))
+		s[.Pre,] = M$q * (fuv - fuvw)
+		fuvwz = FF(x,M,c(.U,.V,.W,.Z))
+		s[.Mld,] = M$q*(1-M$r) * (fuvw - fuvwz)
+		fuvwy = FF(x,M,c(.U,.V,.W,.Y))
+		s[.Svr,] = M$q*M$r * (fuvw - fuvwy)
+		s[.RecS,] = M$q*M$r * fuvwy + M$q*(1-M$r) * fuvwz
+		s[.RecA,] = (1-M$q) * fuvx
 	}
 	s
 }
@@ -144,27 +133,27 @@ AntigenTest = function(sens,spec=1)
 	c(spec,spec,1-sens,1-sens,1-sens,1-sens,spec,spec)
 }
 
-ProbInfected = function(x,p,t,M)
+ProbInfected = function(x,p,observation,M)
 {
 	probs = StateProbs(x,p,M)
-	bot = t %*% probs
-	top = (Infected * t) %*% probs
+	bot = observation %*% probs
+	top = (Infected * observation) %*% probs
 	top/bot
 }
 
-PostProbTransmission = function(x,p,t,M)
+PostProbTransmission = function(x,p,observation,M)
 {
-	q1 = (NoSymptoms * t) %*% StateProbs01(x,M,T)
-	q0 = (NoSymptoms * t) %*% StateProbs01(x,M,F)
+	q1 = observation %*% StateProbs01(x,M,T)
+	q0 = observation %*% StateProbs01(x,M,F)
 	q1 * p / (q1 * p + q0 * (1-p))
 }
 
-ConditionalStateProbs = function(x,p,M,t)
+ConditionalStateProbs = function(x,p,M,observation)
 {
 	y = p * StateProbs01(x,M,TRUE) + (1-p) * StateProbs01(x,M,FALSE)
 	for (j in 1:length(y[1,]))
 	{
-		y[,j] = y[,j]*t
+		y[,j] = y[,j]*observation
 		y[,j] = y[,j]/sum(y[,j])
 	}
 	y
@@ -180,21 +169,18 @@ maximizer = function(x)
 	(1:length(x))[x==max(x)][1]
 }
 
-stateCols = c("green","yellow","pink","orange","red","red","cyan","cyan")
-stateNames = c("Sus","Lat","Asy","Pre","Sym","Sym","Rec","Rec")
-
-pileup = function(x,ss)
+skeletonPileup = function(x,ss,stateCols,stateNames)
 {
 	frame(x,yl="Cumulative probability")
 	s = apply(ss,2,cumsum)
-	lns = rev((1:length(s[,1]))[-c(5,7)])
+	lns = rev(1:length(s[,1]))
 	for (i in lns)
 	{
 		lines(x,s[i,])
 		polygon(c(x,max(x),0),c(s[i,],0,0),col=stateCols[i],border=NA)
 	}
 
-	for (i in c(Sus,Lat,Asy,Pre,Svr,RecA))
+	for (i in lns)
 	{
 		zz = ss[i,]
 		if (i > 1)
@@ -202,26 +188,48 @@ pileup = function(x,ss)
 		else
 			z = rep(0,length(zz))
 
-		if (i == Svr || i == RecA)
-		{
-			zz = ss[i,] + ss[i-1,]
-			z = s[i-2,]
-		}
-		
-
 		if (max(zz) > 0)
 		{
 			whj = maximizer(zz)
-
 			whx = x[whj]
 			whx = min(c(whx,0.90*max(x)))
 			whx = max(c(whx,0.05*max(x)))
-
 			why = z[whj] + zz[whj]/2
-
 			text(whx,why,stateNames[i])
 		}
 	}
 }
 
-x = (0:100)/4
+pileUp = function(x,ss)
+{
+	stateCols = c("green","yellow","pink","orange","magenta","red","cyan","cyan")
+	stateNames = c("Sus","Lat","Asy","Pre","Mld","Svr","RecS","RecA")
+	skeletonPileup(x,ss,stateCols,stateNames)
+}
+
+pileup = function(x,sss,opt=2)
+{
+	ss = matrix(0,ncol=ncol(sss),nrow=nrow(sss)-2)
+
+	if (opt == 2)
+	{
+		stateCols = c("green","yellow","pink","orange","red","cyan")
+		stateNames = c("Sus","Lat","Asy","Pre","Sym","Rec")
+		ss[1:4,] = sss[1:4,]
+		ss[5,] = sss[5,] + sss[6,]
+		ss[6,] = sss[7,] + sss[8,]
+	}
+
+	if (opt == 1)
+	{
+		stateCols = c("yellow","pink","orange","red","cyan","green")
+		stateNames = c("Lat","Asy","Pre","Sym","Rec","Sus")
+		ss[1:3,] = sss[2:4,]
+		ss[4,] = sss[5,] + sss[6,]
+		ss[5,] = sss[7,] + sss[8,]
+		ss[6,] = sss[1,]
+	}
+
+	skeletonPileup(x,ss,stateCols,stateNames)
+}
+
