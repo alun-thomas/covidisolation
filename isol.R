@@ -7,6 +7,7 @@ PCRsens = 0.95
 ANTIsens = 0.90
 x = (0:100)/4
 
+
 pc = function(x,d=0)
 {
 	round(x*100,d)
