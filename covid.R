@@ -6,9 +6,9 @@ library(coga,quietly=TRUE)
 .Pre = 4
 .Mld = 5
 .Svr = 6
-.RecS = 7
-.RecA = 8
-.NStates = .RecA
+.ResS = 7
+.ResA = 8
+.NStates = .ResA
 
 .U = 1
 .V = 2
@@ -16,6 +16,10 @@ library(coga,quietly=TRUE)
 .X = 4
 .Y = 5
 .Z = 6
+
+stateNames = c("Sus","Lat","Asy","Pre","Mld","Svr","ResS","ResA")
+
+stateCols = c("green","yellow","pink","orange","magenta","red","cyan","cyan")
 
 deltaParams = function()
 {
@@ -65,9 +69,10 @@ omicronParams = function()
 
 makeModel = function(Q)
 {
-	means = c(Q$Msus,Q$Mlat,Q$Mpre,Q$Masy,Q$Msev,Q$Mmld)
-	vars = c(Q$Vsus,Q$Vlat,Q$Vpre,Q$Vasy,Q$Vsev,Q$Vmld)
-	list(q=Q$Psymp, r=Q$Psevere, shape=means^2/vars, rate=means/vars) 
+# Order must match definitions above
+	means = c(Q$Msus,Q$Mlat,Q$Masy,Q$Mpre,Q$Mmld,Q$Msev)
+	vars  = c(Q$Vsus,Q$Vlat,Q$Vasy,Q$Vpre,Q$Vmld,Q$Vsev)
+	list(q=Q$Psymp, r=Q$Psevere, shape=means^2/vars, rate=means/vars)
 }
 
 FF = function(x,P,use)
@@ -75,48 +80,92 @@ FF = function(x,P,use)
 	pcoga(x,P$shape[use],P$rate[use])
 }
 
-StateProbs01 = function(x,M,transmission)
+StateProbs = function(x,p,M)
 {
-	s = matrix(0,nrow=.NStates,ncol=length(x))
-	if (transmission)
+	S1 = matrix(0,nrow=.NStates,ncol=length(x))
+	S1[.Sus,] = 0
+	fv = FF(x,M,c(.V))
+	S1[.Lat,] = 1-fv
+	fvw = FF(x,M,c(.V,.W))
+	S1[.Asy,] = (1-M$q)*(fv-fvw)
+	fvx = FF(x,M,c(.V,.X))
+	S1[.Pre,] = M$q*(fv-fvx)
+	fvxy = FF(x,M,c(.V,.X,.Y))
+	S1[.Mld,] = M$q*(1-M$r)*(fvx-fvxy)
+	fvxz = FF(x,M,c(.V,.X,.Z))
+	S1[.Svr,] = M$q*M$r*(fvx-fvxz)
+	S1[.ResS,] = M$q*(M$r*fvxz + (1-M$r)*fvxy)
+	S1[.ResA,] = (1-M$q)*fvw
+
+
+	S0 = matrix(0,nrow=.NStates,ncol=length(x))
+	fu = FF(x,M,c(.U))
+	S0[.Sus,] = 1-fu
+	fuv = FF(x,M,c(.U,.V))
+	S0[.Lat,] = fu-fuv
+	fuvw = FF(x,M,c(.U,.V,.W))
+	S0[.Asy,] = (1-M$q)*(fuv-fuvw)
+	fuvx = FF(x,M,c(.U,.V,.X))
+	S0[.Pre,] = M$q * (fuv - fuvx)
+	fuvxy = FF(x,M,c(.U,.V,.X,.Y))
+	S0[.Mld,] = M$q*(1-M$r) * (fuvx - fuvxy)
+	fuvxz = FF(x,M,c(.U,.V,.X,.Z))
+	S0[.Svr,] = M$q*M$r * (fuvx - fuvxz)
+	S0[.ResS,] = M$q* ( M$r*fuvxz + (1-M$r) * fuvxy)
+	S0[.ResA,] = (1-M$q) * fuvw
+
+	p * S1 + (1-p) * S0
+}
+
+rCovid = function(x,p,M)
+{
+	G = rgamma(length(M$shape),M$shape,M$rate)
+
+	sus = G[.U]
+	if (runif(1) < p)
+		sus = 0
+
+	if (runif(1) < M$q)
 	{
-		s[.Sus,] = 0
-		fv = FF(x,M,c(.V))
-		s[.Lat,] = 1-fv
-		fvx = FF(x,M,c(.V,.X))
-		s[.Asy,] = (1-M$q)*(fv-fvx)
-		fvw = FF(x,M,c(.V,.W))
-		s[.Pre,] = M$q*(fv-fvw)
-		fvwz = FF(x,M,c(.V,.W,.Z))
-		s[.Mld,] = M$q*(1-M$r)*(fvw-fvwz)
-		fvwy = FF(x,M,c(.V,.W,.Y))
-		s[.Svr,] = M$q*M$r*(fvw-fvwy)
-		s[.RecS,] = M$q*M$r*fvwy+M$q*(1-M$r)*fvwz
-		s[.RecA,] = (1-M$q)*fvx
+		s = rep(.ResS,length(x))
+		if (runif(1) < M$r)
+		{
+			s[x < sus + G[.V] + G[.X] + G[.Z]] = .Svr
+		}
+		else
+		{
+			s[x < sus + G[.V] + G[.X] + G[.Y]] = .Mld
+		}
+		s[x < sus + G[.V] + G[.X]] = .Pre
 	}
 	else
 	{
-		fu = FF(x,M,c(.U))
-		s[.Sus,] = 1-fu
-		fuv = FF(x,M,c(.U,.V))
-		s[.Lat,] = fu-fuv
-		fuvx = FF(x,M,c(.U,.V,.X))
-		s[.Asy,] = (1-M$q)*(fuv-fuvx)
-		fuvw = FF(x,M,c(.U,.V,.W))
-		s[.Pre,] = M$q * (fuv - fuvw)
-		fuvwz = FF(x,M,c(.U,.V,.W,.Z))
-		s[.Mld,] = M$q*(1-M$r) * (fuvw - fuvwz)
-		fuvwy = FF(x,M,c(.U,.V,.W,.Y))
-		s[.Svr,] = M$q*M$r * (fuvw - fuvwy)
-		s[.RecS,] = M$q*M$r * fuvwy + M$q*(1-M$r) * fuvwz
-		s[.RecA,] = (1-M$q) * fuvx
+		s = rep(.ResA,length(x))
+		s[x < sus + G[.V] + G[.W]] = .Asy
 	}
+
+	s[x < sus + G[.V]] = .Lat
+	s[x < sus] = .Sus
+
 	s
 }
 
-StateProbs = function(x,p,M)
+asStateMatrix = function(y)
 {
-	p * StateProbs01(x,M,TRUE) + (1-p) * StateProbs01(x,M,FALSE)
+	s = matrix(0,nrow=.NStates,ncol=length(y))
+	#for (j in 1:ncol(s))
+	#	s[y[j],j] = s[y[j],j]+1
+	for (i in 1:nrow(s))
+		s[i,y==i] = s[i,y==i]+1
+	s
+}
+
+SimStateProbs = function(x,p,M,sims=10000)
+{
+	s = matrix(0,nrow=.NStates,ncol=length(x))
+	for (i in 1:sims)
+		s = s+asStateMatrix(rCovid(x,p,M))
+	s/sims
 }
 
 Unconditional = c(1,1,1,1,1,1,1,1)
@@ -133,24 +182,16 @@ AntigenTest = function(sens,spec=1)
 	c(spec,spec,1-sens,1-sens,1-sens,1-sens,spec,spec)
 }
 
-ProbInfected = function(x,p,observation,M)
+ProbInfected = function(probs,observation)
 {
-	probs = StateProbs(x,p,M)
 	bot = observation %*% probs
 	top = (Infected * observation) %*% probs
 	top/bot
 }
 
-PostProbTransmission = function(x,p,observation,M)
+ConditionalStateProbs = function(probs,observation)
 {
-	q1 = observation %*% StateProbs01(x,M,T)
-	q0 = observation %*% StateProbs01(x,M,F)
-	q1 * p / (q1 * p + q0 * (1-p))
-}
-
-ConditionalStateProbs = function(x,p,M,observation)
-{
-	y = p * StateProbs01(x,M,TRUE) + (1-p) * StateProbs01(x,M,FALSE)
+	y = probs
 	for (j in 1:length(y[1,]))
 	{
 		y[,j] = y[,j]*observation
@@ -159,9 +200,16 @@ ConditionalStateProbs = function(x,p,M,observation)
 	y
 }
 
-frame = function(x,xl="Days from exposure",yl="Probability")
+PostProbTransmission = function(P0,P1,observation,p)
 {
-	plot(x,x,type="n",ylim=c(0,1), ylab=yl, xlab=xl)
+	q1 = observation %*% P1
+	q0 = observation %*% P0
+	q1 * p / (q1 * p + q0 * (1-p))
+}
+
+frame = function(x,xl="Days from exposure",yl="Probability",ymax=1)
+{
+	plot(x,x,type="n",ylim=c(0,ymax), ylab=yl, xlab=xl)
 }
 
 maximizer = function(x)
@@ -169,7 +217,7 @@ maximizer = function(x)
 	(1:length(x))[x==max(x)][1]
 }
 
-skeletonPileup = function(x,ss,stateCols,stateNames)
+skeletonPileup = function(x,ss,stCols,stNames)
 {
 	frame(x,yl="Cumulative probability")
 	s = apply(ss,2,cumsum)
@@ -177,7 +225,7 @@ skeletonPileup = function(x,ss,stateCols,stateNames)
 	for (i in lns)
 	{
 		lines(x,s[i,])
-		polygon(c(x,max(x),0),c(s[i,],0,0),col=stateCols[i],border=NA)
+		polygon(c(x,max(x),0),c(s[i,],0,0),col=stCols[i],border=NA)
 	}
 
 	for (i in lns)
@@ -195,15 +243,13 @@ skeletonPileup = function(x,ss,stateCols,stateNames)
 			whx = min(c(whx,0.90*max(x)))
 			whx = max(c(whx,0.05*max(x)))
 			why = z[whj] + zz[whj]/2
-			text(whx,why,stateNames[i])
+			text(whx,why,stNames[i])
 		}
 	}
 }
 
 pileUp = function(x,ss)
 {
-	stateCols = c("green","yellow","pink","orange","magenta","red","cyan","cyan")
-	stateNames = c("Sus","Lat","Asy","Pre","Mld","Svr","RecS","RecA")
 	skeletonPileup(x,ss,stateCols,stateNames)
 }
 
@@ -213,8 +259,8 @@ pileup = function(x,sss,opt=2)
 
 	if (opt == 2)
 	{
-		stateCols = c("green","yellow","pink","orange","red","cyan")
-		stateNames = c("Sus","Lat","Asy","Pre","Sym","Rec")
+		stCols = c("green","yellow","pink","orange","red","cyan")
+		stNames = c("Sus","Lat","Asy","Pre","Sym","Res")
 		ss[1:4,] = sss[1:4,]
 		ss[5,] = sss[5,] + sss[6,]
 		ss[6,] = sss[7,] + sss[8,]
@@ -222,14 +268,14 @@ pileup = function(x,sss,opt=2)
 
 	if (opt == 1)
 	{
-		stateCols = c("yellow","pink","orange","red","cyan","green")
-		stateNames = c("Lat","Asy","Pre","Sym","Rec","Sus")
+		stCols = c("yellow","pink","orange","red","cyan","green")
+		stNames = c("Lat","Asy","Pre","Sym","Res","Sus")
 		ss[1:3,] = sss[2:4,]
 		ss[4,] = sss[5,] + sss[6,]
 		ss[5,] = sss[7,] + sss[8,]
 		ss[6,] = sss[1,]
 	}
 
-	skeletonPileup(x,ss,stateCols,stateNames)
+	skeletonPileup(x,ss,stCols,stNames)
 }
 
