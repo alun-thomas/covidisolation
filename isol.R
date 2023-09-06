@@ -3,8 +3,8 @@ library(xtable,quietly=TRUE)
 DMod = makeModel(deltaParams())
 OPar = omicronParams()
 OMod = makeModel(OPar)
-PCRsens = 0.95
-ANTIsens = 0.90
+PcrSens = 0.95
+AntiSens = 0.90
 x = (0:100)/4
 
 pc = function(x,d=0)
@@ -77,37 +77,151 @@ clearpoint = function(x,probs,q=0.1)
 }
 
 
-x = (0:100)/4
-par(mfrow=c(2,2))
+x = (1:100)/4
+par(mfrow=c(3,2))
 probs = StateProbs(x,pinf,DMod)
-pileup(x,probs)
+ymn=0
+
+pileup(x,probs,ymin=ymn)
+#text(20,0.65,"Sus")
 zz = clearpoint(x,probs,pacc)
 title("(a) Unconditional")
-pileup(x,ConditionalStateProbs(probs,NoSymptoms))
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms),ymin=ymn)
+#text(20,0.65,"Sus")
 zz = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms),pacc)
 title("(b) No symptoms")
-pileup(x,ConditionalStateProbs(probs,NoSymptoms*AntigenTest(ANTIsens)))
-whendanti = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*AntigenTest(ANTIsens)),pacc)
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*NegAntigenTest(AntiSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+whendanti = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*NegAntigenTest(AntiSens)),pacc)
 title("(c) No symptoms and neg antigen test")
-pileup(x,ConditionalStateProbs(probs,NoSymptoms*PcrTest(PCRsens)))
-whendpcr = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*PcrTest(PCRsens)),pacc)
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*NegPcrTest(PcrSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+whendpcr = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*NegPcrTest(PcrSens)),pacc)
 title("(d) No symptoms and neg PCR test")
 
-x = (0:100)/4
-par(mfrow=c(2,2))
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*PosAntigenTest(AntiSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+#whendanti = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*PosAntigenTest(AntiSens)),pacc)
+title("(e) No symptoms and pos antigen test")
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*PosPcrTest(PcrSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+#whendpcr = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*PosPcrTest(PcrSens)),pacc)
+title("(f) No symptoms and pos PCR test")
+
+
+x = (1:100)/4
+par(mfrow=c(3,2))
 probs = StateProbs(x,pinf,OMod)
-pileup(x,probs)
+ymn = 0
+
+pileup(x,probs,ymin=ymn)
+#text(20,0.65,"Sus")
 zz = clearpoint(x,probs,pacc)
 title("(a) Unconditional")
-pileup(x,ConditionalStateProbs(probs,NoSymptoms))
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms),ymin=ymn)
+#text(20,0.65,"Sus")
 zz = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms),pacc)
 title("(b) No symptoms")
-pileup(x,ConditionalStateProbs(probs,NoSymptoms*AntigenTest(ANTIsens)))
-whenoanti = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*AntigenTest(ANTIsens)),pacc)
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*NegAntigenTest(AntiSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+whenoanti = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*NegAntigenTest(AntiSens)),pacc)
 title("(c) No symptoms and neg antigen test")
-pileup(x,ConditionalStateProbs(probs,NoSymptoms*PcrTest(PCRsens)))
-whenopcr = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*PcrTest(PCRsens)),pacc)
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*NegPcrTest(PcrSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+whenopcr = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*NegPcrTest(PcrSens)),pacc)
 title("(d) No symptoms and neg PCR test")
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*PosAntigenTest(AntiSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+#whenoanti = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*PosAntigenTest(AntiSens)),pacc)
+title("(e) No symptoms and pos antigen test")
+
+pileup(x,ConditionalStateProbs(probs,NoSymptoms*PosPcrTest(PcrSens)),ymin=ymn)
+#text(20,0.65,"Sus")
+#whenopcr = clearpoint(x,ConditionalStateProbs(probs,NoSymptoms*PosPcrTest(PcrSens)),pacc)
+title("(f) No symptoms and pos PCR test")
+
+
+CondSimStateProbs = function(x,p,M,t,sel,sims=100000)
+{
+        s = matrix(0,nrow=.NStates,ncol=length(x))
+	wh = min((1:length(x))[x>=t])
+	denom = 0
+        for (i in 1:sims)
+	{
+		rc = asStateMatrix(rCovid(x,p,M))
+		pacc = sum(sel*rc[,wh])
+#		if (runif(1) < pacc)
+#		{
+#			denom = denom + 1
+#                	s = s+rc
+#		}
+		denom = denom + pacc
+		s = s + pacc*rc
+	}
+        s/denom
+}
+
+clearpoint2 = function(x,p,cl=0,q=pacc2)
+{
+	t = min(x[p<=q])
+	abline(v=t,col=cl)
+	abline(h=q,lty=2)
+#	text(t,0,paste(t))
+}
+
+plotem = function(x,t,PP)
+{
+	wh = x>=t
+	QQ=ProbInfected(PP,Unconditional)
+	lines(x[wh],QQ[wh])
+	clearpoint2(x,QQ,cl="black")
+	QQ=ProbInfected(PP,NoSymptoms)
+	lines(x[wh],QQ[wh],col="blue")
+	clearpoint2(x,QQ,cl="blue")
+	QQ=ProbInfected(PP,NoSymptoms*NegPcrTest(PcrSens))
+	lines(x[wh],QQ[wh],col="orange")
+	clearpoint2(x,QQ,cl="orange")
+	QQ=ProbInfected(PP,NoSymptoms*NegAntigenTest(AntiSens))
+	lines(x[wh],QQ[wh],col="red")
+	clearpoint2(x,QQ,cl="red")
+}
+
+set.seed(1001)
+par(mfrow=c(2,2))
+x = (0:100)/4
+ymx = 0.10
+
+frame(x,ymax=ymx)
+t = whendanti
+PP=CondSimStateProbs(x,pinf,DMod,t,NoSymptoms*NegAntigenTest(AntiSens))
+plotem(x,t,PP)
+title("(a) Delta. Antigen test first.")
+
+frame(x,ymax=ymx)
+t = whendpcr
+PP = CondSimStateProbs(x,pinf,DMod,t,NoSymptoms*NegPcrTest(PcrSens))
+plotem(x,t,PP)
+title("(b) Delta. PCR test first.")
+
+frame(x,ymax=ymx)
+t = whenoanti
+PP = CondSimStateProbs(x,pinf,OMod,t,NoSymptoms*NegAntigenTest(AntiSens))
+plotem(x,t,PP)
+title("(c) Omicron. Antigen test first.")
+
+frame(x,ymax=ymx)
+t = whenopcr
+PP = CondSimStateProbs(x,pinf,OMod,t,NoSymptoms*NegPcrTest(PcrSens))
+plotem(x,t,PP)
+title("(d) Omicron. PCR test first.")
 
 x = (0:100)/4
 #prior = c(1,9)/10
@@ -134,7 +248,7 @@ frame(x)
 title("(c) Delta. No symptoms. Antigen neg.")
 for (i in 1:length(prior))
 {
-	q = PostProbTransmission(P0,P1,NoSymptoms*AntigenTest(ANTIsens),prior[i])
+	q = PostProbTransmission(P0,P1,NoSymptoms*NegAntigenTest(AntiSens),prior[i])
 	lines(x,q,col=cols[i])
 	z = x[q==min(q)]
 	abline(v=z)
@@ -145,7 +259,7 @@ frame(x)
 title("(e) Delta. No symptoms. PCR neg.")
 for (i in 1:length(prior))
 {
-	q = PostProbTransmission(P0,P1,NoSymptoms*PcrTest(PCRsens),prior[i])
+	q = PostProbTransmission(P0,P1,NoSymptoms*NegPcrTest(PcrSens),prior[i])
 	lines(x,q,col=cols[i])
 	z = x[q==min(q)]
 	abline(v=z)
@@ -171,7 +285,7 @@ frame(x)
 title("(d) Omicron. No symptoms. Antigen neg.")
 for (i in 1:length(prior))
 {
-	q = PostProbTransmission(P0,P1,NoSymptoms*AntigenTest(ANTIsens),prior[i])
+	q = PostProbTransmission(P0,P1,NoSymptoms*NegAntigenTest(AntiSens),prior[i])
 	lines(x,q,col=cols[i])
 	z = x[q==min(q)]
 	abline(v=z)
@@ -182,7 +296,7 @@ frame(x)
 title("(f) Omicron. No symptoms. PCR neg.")
 for (i in 1:length(prior))
 {
-	q = PostProbTransmission(P0,P1,NoSymptoms*PcrTest(PCRsens),prior[i])
+	q = PostProbTransmission(P0,P1,NoSymptoms*NegPcrTest(PcrSens),prior[i])
 	lines(x,q,col=cols[i])
 	z = x[q==min(q)]
 	abline(v=z)
@@ -214,13 +328,13 @@ z=min(x[y<base])
 abline(v=z,col="blue")
 text(z,0,paste(z))
 
-y=ProbInfected(P1,NoSymptoms*AntigenTest(ANTIsens))
+y=ProbInfected(P1,NoSymptoms*NegAntigenTest(AntiSens))
 lines(x,y,col="red")
 z=min(x[y<base])
 abline(v=z,col="red")
 text(z,0,paste(z))
 
-y=ProbInfected(P1,NoSymptoms*PcrTest(PCRsens))
+y=ProbInfected(P1,NoSymptoms*NegPcrTest(PcrSens))
 lines(x,y,col="orange")
 z=min(x[y<base])
 abline(v=z,col="orange")
@@ -247,88 +361,15 @@ z=min(x[y<base])
 abline(v=z,col="blue")
 text(z,0,paste(z))
 
-y=ProbInfected(P1,NoSymptoms*AntigenTest(ANTIsens))
+y=ProbInfected(P1,NoSymptoms*NegAntigenTest(AntiSens))
 lines(x,y,col="red")
 z=min(x[y<base])
 abline(v=z,col="red")
 text(z,0,paste(z))
 
-y=ProbInfected(P1,NoSymptoms*PcrTest(PCRsens))
+y=ProbInfected(P1,NoSymptoms*NegPcrTest(PcrSens))
 lines(x,y,col="orange")
 z=min(x[y<base])
 abline(v=z,col="orange")
 #text(z,0,paste(z))
-
-CondSimStateProbs = function(x,p,M,t,sel,sims=100000)
-{
-        s = matrix(0,nrow=.NStates,ncol=length(x))
-	wh = min((1:length(x))[x>=t])
-	denom = 0
-        for (i in 1:sims)
-	{
-		rc = asStateMatrix(rCovid(x,p,M))
-		pacc = sum(sel*rc[,wh])
-#		if (runif(1) < pacc)
-#		{
-#			denom = denom + 1
-#                	s = s+rc
-#		}
-		denom = denom + pacc
-		s = s + pacc*rc
-	}
-        s/denom
-}
-
-clearpoint2 = function(x,p,cl=0,q=pacc2)
-{
-	t = min(x[p<=q])
-	abline(v=t,col=cl)
-#	text(t,0,paste(t))
-}
-
-plotem = function(x,t,PP)
-{
-	wh = x>=t
-	QQ=ProbInfected(PP,Unconditional)
-	lines(x[wh],QQ[wh])
-	clearpoint2(x,QQ,cl="black")
-	QQ=ProbInfected(PP,NoSymptoms)
-	lines(x[wh],QQ[wh],col="blue")
-	clearpoint2(x,QQ,cl="blue")
-	QQ=ProbInfected(PP,NoSymptoms*PcrTest(PCRsens))
-	lines(x[wh],QQ[wh],col="orange")
-	clearpoint2(x,QQ,cl="orange")
-	QQ=ProbInfected(PP,NoSymptoms*AntigenTest(ANTIsens))
-	lines(x[wh],QQ[wh],col="red")
-	clearpoint2(x,QQ,cl="red")
-}
-
-set.seed(1001)
-par(mfrow=c(2,2))
-x = (0:100)/4
-ymx = 0.10
-
-frame(x,ymax=ymx)
-t = whendanti
-PP=CondSimStateProbs(x,pinf,DMod,t,NoSymptoms*AntigenTest(ANTIsens))
-plotem(x,t,PP)
-title("(a) Delta. Antigen test first.")
-
-frame(x,ymax=ymx)
-t = whendpcr
-PP = CondSimStateProbs(x,pinf,DMod,t,NoSymptoms*PcrTest(PCRsens))
-plotem(x,t,PP)
-title("(b) Delta. PCR test first.")
-
-frame(x,ymax=ymx)
-t = whenoanti
-PP = CondSimStateProbs(x,pinf,OMod,t,NoSymptoms*AntigenTest(ANTIsens))
-plotem(x,t,PP)
-title("(c) Omicron. Antigen test first.")
-
-frame(x,ymax=ymx)
-t = whenopcr
-PP = CondSimStateProbs(x,pinf,OMod,t,NoSymptoms*PcrTest(PCRsens))
-plotem(x,t,PP)
-title("(d) Omicron. PCR test first.")
 

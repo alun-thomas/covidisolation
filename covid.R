@@ -172,14 +172,24 @@ Unconditional = c(1,1,1,1,1,1,1,1)
 NoSymptoms = c(1,1,1,1,0,0,0,1)
 Infected = c(0,1,1,1,1,1,0,0)
 
-PcrTest = function(sens,spec=1)
+NegPcrTest = function(sens,spec=1)
 {
 	c(spec,spec,1-sens,1-sens,1-sens,1-sens,1-sens,1-sens)
 }
 
-AntigenTest = function(sens,spec=1)
+PosPcrTest = function(sens,spec=1)
+{
+	1-c(spec,spec,1-sens,1-sens,1-sens,1-sens,1-sens,1-sens)
+}
+
+NegAntigenTest = function(sens,spec=1)
 {
 	c(spec,spec,1-sens,1-sens,1-sens,1-sens,spec,spec)
+}
+
+PosAntigenTest = function(sens,spec=1)
+{
+	1-c(spec,spec,1-sens,1-sens,1-sens,1-sens,spec,spec)
 }
 
 ProbInfected = function(probs,observation)
@@ -195,7 +205,10 @@ ConditionalStateProbs = function(probs,observation)
 	for (j in 1:length(y[1,]))
 	{
 		y[,j] = y[,j]*observation
-		y[,j] = y[,j]/sum(y[,j])
+		if (sum(y[,j] > 0))
+			y[,j] = y[,j]/sum(y[,j])
+		else
+			y[,j] = 0*y[,j]
 	}
 	y
 }
@@ -207,9 +220,9 @@ PostProbTransmission = function(P0,P1,observation,p)
 	q1 * p / (q1 * p + q0 * (1-p))
 }
 
-frame = function(x,xl="Days from exposure",yl="Probability",ymax=1)
+frame = function(x,xl="Days from exposure",yl="Probability",ymin=0,ymax=1)
 {
-	plot(x,x,type="n",ylim=c(0,ymax), ylab=yl, xlab=xl)
+	plot(x,x,type="n",ylim=c(ymin,ymax), ylab=yl, xlab=xl)
 }
 
 maximizer = function(x)
@@ -217,9 +230,9 @@ maximizer = function(x)
 	(1:length(x))[x==max(x)][1]
 }
 
-skeletonPileup = function(x,ss,stCols,stNames)
+skeletonPileup = function(x,ss,stCols,stNames,ymin=0,ymax=1)
 {
-	frame(x,yl="Cumulative probability")
+	frame(x,yl="Cumulative probability",ymin=ymin,ymax=ymax)
 	s = apply(ss,2,cumsum)
 	lns = rev(1:length(s[,1]))
 	for (i in lns)
@@ -248,12 +261,12 @@ skeletonPileup = function(x,ss,stCols,stNames)
 	}
 }
 
-pileUp = function(x,ss)
+pileUp = function(x,ss,ymin=0,ymax=1)
 {
-	skeletonPileup(x,ss,stateCols,stateNames)
+	skeletonPileup(x,ss,stateCols,stateNames,ymax=ymax,ymin=ymin)
 }
 
-pileup = function(x,sss,opt=2)
+pileup = function(x,sss,opt=2,ymin=0,ymax=1)
 {
 	ss = matrix(0,ncol=ncol(sss),nrow=nrow(sss)-2)
 
@@ -276,6 +289,6 @@ pileup = function(x,sss,opt=2)
 		ss[6,] = sss[1,]
 	}
 
-	skeletonPileup(x,ss,stCols,stNames)
+	skeletonPileup(x,ss,stCols,stNames,ymax=ymax,ymin=ymin)
 }
 
